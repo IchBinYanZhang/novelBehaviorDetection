@@ -1,23 +1,27 @@
+function Result= evaluation_metric_CMUMAD(gtlabE, tslab, thr, is_show)
 
-% The MAD database example codes
-% Citation: 
-% Dong Huang, Yi Wang, Shitong Yao and F. De la Torre. Sequential Max-Margin Event Detectors, ECCV 2014
-% The script is modified by yan.zhang@uni-ulm.de, to evaluate novel
-% behavior detection using 50% overlap rule and non-resuable labels.
-% 
-function Result= funEvalDetection_CMUMAD(gtlabE, tslab, bd_offset, region_offset, is_show)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Evaluation is two-fold:
+%   (1) boundary-based precision-recall
+%   (2) confusion matrix for novel behavior recognition
+%       Each input sample is encoded to two states: a) in new cluster and
+%       b) in old cluster
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % INPUTS:
-%
 % gtlab: frame-level ground truth label (obtain by loading a true label file)
 % tslab: frame-level label obtained by your algorithm
-% thr: threshold of overlap ratio between 
+% thr: threshold for segment boundary matching
 % 
 % OUTPUTS:
-% Result.tru_N: total number of events 
-%       .dct_N: total number of detected events
-%       .dct_NT:dct_NT: number of correctly detection events
-%       .Prec: correctly detected events over all detected events (dct_NT/dct_N)
+% Result.Segmentation.
+%       .Pre: correctly detected events over all detected events (dct_NT/dct_N)
 %       .Rec: correctly detected events over all ground truth events (dct_NT/tru_N)
+% Result.NovelBehavior.
+%       .ConMat: confusion matrix
+%       .Pre: precision of novel behavior
+%       .Rec: recall of novel behavior
+
 
 
 %%% parse ground truth files
@@ -38,9 +42,10 @@ seglab(seglab(:,1)>=length(tslab)) = [];
 gtlab = gtlabE;
 seglab = seglab;
 gtlab_label = [gtlab(:,1) seglab];
+
 %%% evaluation of segmentation, without considering the labels. 
 %%% boundary based evaluation
-bd_offset = 7;
+bd_offset = thr;
 tp = 0;
 gt_idx = seglab(:,2);
 prd_idx = find(diff(tslab));
@@ -49,7 +54,7 @@ true_N = length(gt_idx);
 prd_N = length(prd_idx);
 for i = 1:length(gt_idx)
     lb = max(1, gt_idx(i)-bd_offset);
-    ub = min(length(gt_idx), gt_idx(i)+bd_offset);
+    ub = min(length(tslab), gt_idx(i)+bd_offset);
     segment = tslab(lb:ub);
     prd_idx0 = find(diff(segment));
     if ~isempty(prd_idx0)
@@ -57,117 +62,55 @@ for i = 1:length(gt_idx)
     end
 end
 if prd_N==0
-    Result.segmentation.precision = 0;
-    Result.segmentation.recall = 0;
+    Result.Segmentation.Pre = 0;
+    Result.Segmentation.Rec = 0;
 else
-    Result.segmentation.precision = tp/prd_N;
-    Result.segmentation.recall = tp/true_N;
+    Result.Segmentation.Pre = tp/prd_N;
+    Result.Segmentation.Rec = tp/true_N;
 end
 
 
+%%% evaluation of states classification.
+%%% Each sample is encoded to two states: a) in old cluster and b) in new
+%%% cluster
 
-%%% evaluation of unsupervised action detection.
-%%% compute precision and recall for each individual action class
-region_offset = 0.5;
-used_label=[];
-n_class = 35;%% the null actions has a label 0
-for nn = 1:n_class
-    idx = find(gtlab_label(:,1)==nn);
-    gt_ts = gtlab_label(idx, 2:3); %% [t_begin t_end]
-    
-    n_seg_nn = size(gt_ts,1);
-    true_N = n_seg_nn;
-    for ss = 1:n_seg_nn
-    
-        gt_seg = ones(gt_ts(ss,2)-gt_ts(ss,1),1)*nn;
-        prd_seg = tslab(gt_ts(ss,1):gt_ts(ss,2));
-        mj_label = mode(prd_seg);
-        prd_seg(prd_seg==mj_label) = nn;
-        ratio = sum(prd_seg==gt_seg)/(gt_ts(2)-gt_ts(1));
-        if isempty(used_label)
-            if ratio > region_offset
-            
-
-
-
-
-
-
-%%% compute true positives
-used_label = []; %%% each row: gt_label -> dec_label, one-to-one mapping
-dct_NT = 0;
-tru_N = size(seglab,1);
+%%%% encode gtlab to state labels %%%%
+n_frames = length(tslab);
+yt = 2*ones(n_frames,1);
+used_label = [];
 for i = 1:size(seglab,1)
-    tsseg = tslab(seglab(i,1):seglab(i,2));
-    mj_label = mode(tsseg);    
-    tsseg(tsseg==mj_label)=gtlab(i,1);
-    ratio = sum(tsseg==gtlab(i,1)) / gtlab(i,2);
-    
-    %%% the first detection
-    if isempty(used_label)
-        if ratio > thr 
-            dct_NT = dct_NT + 1;
-        end
-        used_label = [used_label; [gtlab(i,1),mj_label] ];
-    else
-    
-        %%% when a new ground truth action is evaluated
-        if isempty(find(used_label(:,1)==gtlab(i,1)))
-            %%% if the detected label is also new, true positive++ and we
-            %%% update the label mapping
-            if ratio > thr && isempty( find(used_label(:,2)==mj_label) )
-                dct_NT = dct_NT + 1;
-                used_label = [used_label; [gtlab(i,1),mj_label] ];
-            end
-
-        %%% when a gt action which has occured before..    
-        else
-            %%% if the detected label is also match, true positive++
-            if ratio > thr && used_label(used_label(:,1)==gtlab(i,1),2)==mj_label
-                dct_NT = dct_NT + 1;
-            end
-        end
+    if sum( ismember(used_label, gtlab_label(i,1) ))==0 %% new cluster
+        yt(gtlab_label(i,2):gtlab_label(i,3)) = 1;
+        used_label = [used_label; gtlab_label(i,1)];
     end
-        
+end
+
+%%%% encode tslab to state labels %%%%
+ytp = 2*ones(n_frames,1);
+changeframe = 1;
+j = 1;
+used_label = [];
+while j < n_frames
+    jump = tslab(j+1)-tslab(j);
+    if jump ~= 0  %% a boundary is detected
+        seg = tslab(changeframe:j);
+        mj_label = mode(seg);
+        if sum( ismember(used_label, mj_label ))==0 %% new cluster
+            ytp(changeframe : j) = 1;
+            used_label = [used_label; mj_label];
+        end
+        changeframe = j;
+    end
+    j = j+1;
 end
 
 
-%%% compute positives
-dct_N=1; %% it was 0 in the original work, but it is not correct
-changeframe=1; 
-for i=1:length(tslab)-1
-    if (abs(tslab(i+1)-tslab(i))>0) % a change point
-       if  ((i-changeframe)>2) % min length
-           changeframe=i; 
-%            if tslab(changeframe)~=0 % not null class
-          dct_N=dct_N+1; 
-%            end
-       end
-    end
-    
-end
+%%%% compute the confusion matrix 
+Result.NovelBehavior.ConMat = confusionmat(yt, ytp);
+Result.NovelBehavior.Pre = Result.NovelBehavior.ConMat(1,1)/sum(ytp==1);
+Result.NovelBehavior.Rec = Result.NovelBehavior.ConMat(1,1)/sum(yt==1);
 
 
-
-
-% Output------
-Result.tru_N= tru_N; %total number of events 
-Result.dct_N= dct_N; %total number of detected events
-Result.dct_NT=dct_NT; %number of correctly detection events
-Result.Prec= dct_NT/dct_N; %correctly detected events over all detected events (dct_NT/dct_N)
-Result.Rec=dct_NT/tru_N;%correctly detected events over all ground truth events (dct_NT/tru_N)
-% gt = [];
-% for i = 1:size(gtlabE, 1)
-%     gt = [gt; repmat(gtlabE(i,1), gtlabE(i,2), 1)];
-% end
-% gt = gt(1:end-1);
-% 
-% [pp,rr,ff] = evaluate(tslab, gt, delta);
-% randIdx = calRandIdx(tslab, gt);
-% Result.precision = tru_N;
-% Result.recall = rr;
-% Result.f_score = ff;
-% Result.RandIdx = randIdx;
 
 
 % Show Bar-------
@@ -285,8 +228,6 @@ if is_show
 
     gt = subplot(2,1,1);
     imagesc(im_true);
-    % ft1 = title('');
-    % set(ft1, 'FontSize', 10);
     set(gt, 'XTick', []);
     set(get(gca,'XLabel'),'String','Frame')
     set(gt, 'XTickLabel', []);
@@ -294,9 +235,6 @@ if is_show
     set(get(gca,'YLabel'),'String','True')
     set(gt, 'Layer', 'bottom');
     axis on
-    title(['Event-based Detection Results (',num2str(thr),' overlap): Total Events=',num2str(class_N),...
-           ': Precision=', num2str(Result.Prec),...
-           '; Recall=', num2str(Result.Rec)])
 
     ts = subplot(2,1,2);
     imagesc(im_test);
@@ -313,97 +251,7 @@ if is_show
     end
 end
 
-% function a = findMostFrequentNumber(vec)
-% ele = unique(vec);
-% num = zeros(length(ele),1);
-% a = 0;
-% for i = 1: length(ele)
-%     num = sum(vec == ele(i));
-%     if num > a
-%         a = num;
-%     end
-% end
-% 
-% end
 
-
-function randIdx = calRandIdx(prd, gt)
-a = 0; 
-b = 0; 
-c = 0; 
-d = 0;
-
-for ii = 1:length(gt)
-    for jj = 1:length(gt)
-        if prd(ii)==prd(jj)
-            if gt(ii) == gt(jj)
-                a = a+1;
-            else
-                c = c+1;
-            end
-        else
-            if gt(ii) == gt(jj)
-                b = b+1;
-            else
-                d = d+1;
-            end
-        end
-    end
-end
-randIdx=  (a+b)/(a+b+c+d);
-end
-
-
-
-
-
-function [pp,rr,ff] = evaluate(prd, gt, delta)
-
-%%% first, we find the index of the segment boundaries
-prdf = abs(diff(prd));
-gtf = abs(diff(gt));
-
-idx_prdf = find(abs(diff(prd))>0.1);
-idx_gtf = find(abs(diff(gt))>0.1);
-
-% fprintf('--- n_segment_gt=%f  n_segment_prd = %f  \n', length(idx_gtf), length(idx_prdf));
-
-
-pp = 0;
-tp = 0;
-
-%%% compute recall
-for i = 1:length(idx_gtf)
-    idx = idx_gtf(i);
-    lb = max(1, idx-delta);
-    ub = min(length(prdf), idx+delta);
-    score_seg = prdf(lb:ub);
-    if ~isempty(find(score_seg > 0.1))
-        tp=tp+1;
-    end
-end
-rr = tp/length(idx_gtf);
-
-%%% compute precision
-% for i = 1:length(idx_prdf)
-%     idx = idx_prdf(i);
-%     lb = max(1, idx-delta);
-%     ub = min(length(gtf), idx+delta);
-%     score_seg = gtf(lb:ub);
-%     if ~isempty(find(score_seg > 0.1))
-%         pp=pp+1;
-%     end
-% end
-pp = tp/length(idx_prdf);
-if isempty(idx_prdf)
-    pp = 0;
-    rr = 0;
-end
-
-%%% compute f measure
-ff = 2*pp*rr/(pp+rr);
-
-end
 
 function label = labelConv(lab, mode)
 %
@@ -462,3 +310,5 @@ else
 end
 
 end
+
+
