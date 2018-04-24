@@ -1,5 +1,5 @@
 clear all;
-close all;
+% close all;
 clc;
 addpath(genpath('../../eval_package'));
 addpath(genpath('../../aca'));
@@ -15,28 +15,42 @@ dataset_info = split(importdata([dataset_path '/annotation.txt']));
 video_list = unique(dataset_info(:,1));
 
 %%% scenario configuration - before each running, check here!"
-feature_list = {'jointLocs','relativeAngle','quaternion'};
-method_list = {'kmeans','spectralClustering','TSC','ACA','ours'};
+feature_list = {'quaternion'};
+% method_list = {'spectralClustering','TSC','ACA'};
+method_list = {'ours'};
 
-method = method_list{end};
-feature = feature_list{3};
+
+for ff = 1:length(feature_list)
+
+for mm = 1:length(method_list)
+
+
+feature = feature_list{ff};
+method = method_list{mm};
+
+if strcmp(method, 'spectralClustering') && strcmp(feature, 'jointLocs')
+    continue;
+end
+
 
 is_show = 0; 
 %%% scenario configuration - end"
 
-Precision = [];
-Recall = [];
+Pre = [];
+Rec = [];
+CMat = zeros(2,2);
 CptTime = [];
 
 for vv = 1:length(video_list)    
-    
+
+
     % only consider scenarios 03
     if ~contains(video_list{vv},'_03-')
         continue;
     end
     
     %------------------ fearture extraction and annotation----------------%
-    fprintf('------- processing: %s\n', video_list{vv});
+%     fprintf('------- processing: %s\n', video_list{vv});
     %%% find annotation
     bds = dataset_info(find( strcmp(dataset_info(:,1),video_list{vv})), 2:3 );
     ytt = unique(sort(reshape(cellfun(@str2num,bds),[],1)));
@@ -81,7 +95,7 @@ for vv = 1:length(video_list)
         end
     end
         
-    n_clusters = 15;
+    n_clusters = 15; %% this number refer to http://resources.mpi-inf.mpg.de/HDM05/2009_MuellerBa_MotionAnnotation_SCA.pdf
     %------------------ run methods and make evaluations------------------%
     
     startTime = tic;
@@ -151,42 +165,38 @@ for vv = 1:length(video_list)
         idx(end) = []; %%% remove redudant frame
 
     elseif strcmp(method,'ours')
-        time_window = 5;
-        sigma = 0.05;
-        
+        sigma = 0.025;
+        dist_type = 0; % Euclidean distance
+        verbose = 0;
+%                     disp('--online learn the clusters and labels..');
+%                     [idx, C] = incrementalClustering(double(pattern), time_window,sigma,0,0,1.0);
+%                     [idx1, C] = incrementalClusteringAndOnlineAgg(double(pattern), time_window, sigma, 0, 0, 1.0);
+        [idx1, c_locs, c_stds, c_ex2, c_sizes] = dynamicEM(double(pattern), sigma, dist_type,verbose);
+        %%% uncomment the following for online processing
+%                     disp('--postprocessing, merge clusters');
+%         idx = fun_feature_aggregation(pattern,idx1,c_locs,'ours', 'HDM05');
+        idx = fun_feature_aggregation_slidingwindow(pattern,c_locs,3e-5);
 
-%         disp('--online learn the clusters and labels..');
-        [idx1, C] = incrementalClustering(double(pattern), time_window,sigma,0,0,1.0);
-%         idx2 = zeros(size(idx1));
-%         for kk = 2:length(idx1)
-%             if idx1(kk)~=idx1(kk-1)
-%                 idx2(kk) = idx1(kk)+randi(length(unique(idx1)))-1;
-%             else
-%                 idx2(kk) = idx2(kk-1);
-%             end
-%         end
-%         uid = mode(idx2);
-%         idx2(idx2==uid) = 10e6;
-%         idx2(idx2==0) = uid;
-%         idx2(idx2==10e6) = 0;
-%         disp('--postprocessing, merge clusters');
-         idx = calLocalFeatureAggregationAndClustering_TUMKitchen(pattern,idx1,C, n_clusters,'normal_action'); 
-        %idx = idx1;
     end
     CptTime = [CptTime toc(startTime)];
-%     Result= funEvalSegmentation_TUMKitchen(yt, idx, 7, is_show, method,bodypart,feature,vv);
-    Result= funEvalSegmentation_TUMKitchen(yt, idx, 7, is_show);
-    Precision = [Precision Result.Prec];
-    Recall = [Recall Result.Rec];
-end
-disp('====================================================')
-disp('Evaluation Results:')
-fprintf('Method: %s\n',method);
-fprintf('Feature: %s\n',feature);
-fprintf('ave_precision: %f\n',mean(Precision));
-fprintf('ave_recall: %f\n',mean(Recall));
-fprintf('ave_runtime: %f\n',mean(CptTime));
+    res = evaluation_metric_TUMKitchen(yt, double(idx), 7, false); % tol range = 7
 
+    Pre = [Pre res.Segmentation.Pre];
+    Rec = [Rec res.Segmentation.Rec];
+    CMat = CMat + res.NovelBehavior.ConMat;
+end
+fprintf('====HDM05-sports========%s========%s================\n',feature, method)
+fprintf('- segmentation: avg_pre = %f\n',mean(Pre));
+fprintf('- segmentation: avg_rec = %f\n',mean(Rec));
+fprintf('- novelBehavior: avg_pre = %f\n',CMat(1,1)/(CMat(2,1)+CMat(1,1)));
+fprintf('- novelBehavior: avg_rec = %f\n',CMat(1,1)/(CMat(1,2)+CMat(1,1)));
+fprintf('- avg_runtime = %f seconds\n',mean(CptTime));
+
+result_filename = sprintf('HDM05_Result_%s_%s.mat',feature,method);
+save(result_filename, 'Pre','Rec','CMat','CptTime');
+
+end
+end
 
 
     

@@ -23,51 +23,105 @@ function Result= evaluation_metric_CMUMAD(gtlabE, tslab, thr, is_show)
 %       .Rec: recall of novel behavior
 
 
-
+tslab(tslab<0) = 0;
 %%% parse ground truth files
 gtlabE(gtlabE(:,1)==36, 1)=0; 
+% tslab1 = tslab;
+% tslab(tslab>=36)=0;
 class_N=length(unique(gtlabE(:,1)));
 e = cumsum(gtlabE(:,2));
 s = [1; e(1:end-1)+1];
 seglab = [s e];
 
-
 %%% unify the length of annotation and detection
 %%% in some videos of CMUMAD, annotation is longer than feature sequence
-gtlabE(seglab(:,1)>=length(tslab)) = [];
-seglab(seglab(:,1)>=length(tslab)) = [];
+gtlabE(seglab(:,1)>=length(tslab),:) = [];
+seglab(seglab(:,1)>=length(tslab),:) = [];
 
-%%% consider all the labels including static poses
-% sel = (gtlabE(:,1)~=0);
-gtlab = gtlabE;
-seglab = seglab;
-gtlab_label = [gtlab(:,1) seglab];
+%%% only for the online parsing metric
+
+
+
+
+%%% only compute gtlab_label, which is used for computing novel behaviours
+gtlab1 = gtlabE;
+seglab1 = seglab;
+gtlab_label = [gtlab1(:,1) seglab1];
+
+%%% follow the original metric of CMUMAD in dynamic clustering
+sel = (gtlabE(:,1)~=0);
+gtlab = gtlabE(sel,:);
+seglab = seglab(sel,:);
+
+used_label = [];
+dct_NT = 0;
+tru_N = sum(sel);
+for i = 1:size(seglab,1)
+    tsseg = tslab(seglab(i,1):min(seglab(i,2), length(tslab)));
+    mj_label = mode(tsseg);
+    if mj_label~=0
+    if isempty(find(used_label==mj_label))
+        tsseg(tsseg==mj_label)=gtlab(i,1);
+        ratio = sum(tsseg==gtlab(i,1)) / gtlab(i,2);
+        if ratio > thr
+            dct_NT = dct_NT + 1;
+        end
+        used_label = [used_label,mj_label];
+    end
+    end
+        
+end
+
+
+dct_N=1; %% it was 0 in the original work, but it is not correct
+changeframe=1; 
+for i=1:length(tslab)-1
+    if (abs(tslab(i+1)-tslab(i))>0) % a change point
+       if  ((i-changeframe)>2) % min length
+           changeframe=i; 
+           if tslab(changeframe)~=0 % not null class
+              dct_N=dct_N+1; 
+           end
+       end
+    end
+    
+end
+
+
+if dct_N~=0
+    Result.Segmentation.Pre = dct_NT/dct_N;
+    Result.Segmentation.Rec = dct_NT/tru_N;
+else
+    Result.Segmentation.Pre = 0;
+    Result.Segmentation.Rec = 0;
+end
+
 
 %%% evaluation of segmentation, without considering the labels. 
 %%% boundary based evaluation
-bd_offset = thr;
-tp = 0;
-gt_idx = seglab(:,2);
-prd_idx = find(diff(tslab));
-gt_idx(end) = [];
-true_N = length(gt_idx);
-prd_N = length(prd_idx);
-for i = 1:length(gt_idx)
-    lb = max(1, gt_idx(i)-bd_offset);
-    ub = min(length(tslab), gt_idx(i)+bd_offset);
-    segment = tslab(lb:ub);
-    prd_idx0 = find(diff(segment));
-    if ~isempty(prd_idx0)
-       tp = tp+1;
-    end
-end
-if prd_N==0
-    Result.Segmentation.Pre = 0;
-    Result.Segmentation.Rec = 0;
-else
-    Result.Segmentation.Pre = tp/prd_N;
-    Result.Segmentation.Rec = tp/true_N;
-end
+% bd_offset = thr;
+% tp = 0;
+% gt_idx = seglab(:,2);
+% prd_idx = find(diff(tslab));
+% gt_idx(end) = [];
+% true_N = length(gt_idx);
+% prd_N = length(prd_idx);
+% for i = 1:length(gt_idx)
+%     lb = max(1, gt_idx(i)-bd_offset);
+%     ub = min(length(tslab), gt_idx(i)+bd_offset);
+%     segment = tslab(lb:ub);
+%     prd_idx0 = find(diff(segment));
+%     if ~isempty(prd_idx0)
+%        tp = tp+1;
+%     end
+% end
+% if prd_N==0
+%     Result.Segmentation.Pre = 0;
+%     Result.Segmentation.Rec = 0;
+% else
+%     Result.Segmentation.Pre = tp/prd_N;
+%     Result.Segmentation.Rec = tp/true_N;
+% end
 
 
 %%% evaluation of states classification.
@@ -78,7 +132,7 @@ end
 n_frames = length(tslab);
 yt = 2*ones(n_frames,1);
 used_label = [];
-for i = 1:size(seglab,1)
+for i = 1:size(seglab1,1)
     if sum( ismember(used_label, gtlab_label(i,1) ))==0 %% new cluster
         yt(gtlab_label(i,2):gtlab_label(i,3)) = 1;
         used_label = [used_label; gtlab_label(i,1)];
@@ -86,24 +140,41 @@ for i = 1:size(seglab,1)
 end
 
 %%%% encode tslab to state labels %%%%
+
 ytp = 2*ones(n_frames,1);
 changeframe = 1;
 j = 1;
 used_label = [];
-while j < n_frames
-    jump = tslab(j+1)-tslab(j);
-    if jump ~= 0  %% a boundary is detected
-        seg = tslab(changeframe:j);
+prd = tslab;
+while j <= n_frames
+    if j ~= n_frames
+        jump = prd(j+1)-prd(j);
+        if jump ~= 0  %% a boundary is detected
+            seg = prd(changeframe:j);
+            mj_label = mode(seg);
+            if sum( ismember(used_label, mj_label ))==0 %% new cluster
+                ytp(changeframe : j) = 1;
+                used_label = [used_label; mj_label];
+            end
+            changeframe = j;
+        end
+        
+    else
+        seg = prd(changeframe:j);
         mj_label = mode(seg);
         if sum( ismember(used_label, mj_label ))==0 %% new cluster
             ytp(changeframe : j) = 1;
             used_label = [used_label; mj_label];
         end
-        changeframe = j;
     end
     j = j+1;
 end
 
+if length(yt)~= length(ytp)
+    dd = min(length(yt), length(ytp));
+    yt = yt(1:dd);
+    ytp = ytp(1:dd);
+end
 
 %%%% compute the confusion matrix 
 Result.NovelBehavior.ConMat = confusionmat(yt, ytp);

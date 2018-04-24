@@ -76,10 +76,11 @@ struct Global {
     cv::Mat sample_labels;
     float RADIUS_OFFSET = 0; // initial floating error
     float sigma0;
+    bool use_previous_results = 0;
     struct Codebook {
         int n_clusters;
         cv::Mat n_samples_per_cluster; // N
-        cv::Mat cluster_labels; // cluster index
+        cv::Mat cluster_labels; // cluste
         cv::Mat cluster_locs; // mu
         cv::Mat cluster_stds; // sigma
         cv::Mat cluster_Ex2;  // E[x^2]
@@ -223,24 +224,20 @@ void calDistSampleToCluster(cv::Mat& phi, cv::Mat& dist) {
 
 
 
-// rather than clustering, we only use the first sample
-void initializeCodebook() {
-    cv::Mat x = global.sample_buffer[0];
-    global.codebook.n_clusters = 1;
-    global.codebook.n_samples_per_cluster.push_back(1.0f);
-    global.codebook.cluster_labels.push_back(0.0f);
-    global.codebook.cluster_locs = x;
-    global.codebook.cluster_stds = cv::Mat::zeros(1, x.cols, CV_32F);
-    global.codebook.cluster_Ex2 = x.mul(x);
-    global.sample_labels.push_back(0.0f);
-}
-
 
 
 void updateCodebook() {
 
+    int starting_idx = 0;
+    if(global.use_previous_results)
+        starting_idx = 0;
+    else
+        starting_idx = 1;
+
+
     // start from the second sample to the end
-    for(int i = 1; i < global.sample_buffer.size(); i++) {
+    for(int i = starting_idx; i < global.sample_buffer.size(); i++) {
+
 
         cv::Mat _dist, _joints, _joints_repmat;
         double _dist_min;
@@ -271,7 +268,7 @@ void updateCodebook() {
                 std::cout<< "[CODEBOOK INFO] updateCodebook(): creating new cluster";
 
             // new cluster and sample labels
-            global.codebook.cluster_labels.push_back((float)global.codebook.n_clusters);
+            global.codebook.cluster_labels.push_back(global.codebook.n_clusters);
             global.sample_labels.push_back((float)global.codebook.n_clusters);
 
             // new num_clusters
@@ -360,20 +357,40 @@ void runDynamicEM() {
 //     }
 // }
 
+// rather than clustering, we only use the first sample
+void initializeCodebook() {
+    cv::Mat x = global.sample_buffer[0];
+    global.codebook.n_clusters = 1;
+    global.codebook.n_samples_per_cluster.push_back(1.0f);
+    global.codebook.cluster_labels.push_back(0);
+    global.codebook.cluster_locs = x;
+    global.codebook.cluster_stds = cv::Mat::zeros(1, x.cols, CV_32F);
+    global.codebook.cluster_Ex2 = x.mul(x);
+    global.sample_labels.push_back(0.0f);
+}
 
 
-// initialize the codebook based on the inputs
+
+// initialize the codebook based on the inputs. Has bugs to check //TODO
 void parseArgsToCodebook(const cv::Mat& cluster_locs0, const cv::Mat& cluster_stds0,
-                         const cv::Mat& cluster_Ex20, const cv::Mat& cluster_sizes0){
+                         const cv::Mat& cluster_Ex20, const cv::Mat& cluster_sizes0)
+{
     global.codebook.n_clusters = cluster_locs0.rows;
-    for(int i = 0; i < cluster_locs0.rows; i++){
-        global.codebook.n_samples_per_cluster.push_back(cluster_sizes0.at<float>(i));
-        global.codebook.cluster_labels.at<float>(i) = float(i);
+    if(global.VERBOSE){
+            std::cout << "parsing cluster labels" << std::endl;
+            std::cout << cluster_sizes0 << std::endl;
     }
 
+    for(int i = 0; i < cluster_locs0.rows; i++){    
+        global.codebook.n_samples_per_cluster.push_back(cluster_sizes0.at<float>(i));
+        global.codebook.cluster_labels.push_back(0);
+    }
+    if(global.VERBOSE)  
+            std::cout << "parsing cluster structures" << std::endl;
     global.codebook.cluster_locs = cluster_locs0.clone();
     global.codebook.cluster_stds = cluster_stds0.clone();
     global.codebook.cluster_Ex2 = cluster_Ex20.clone();
+    global.use_previous_results = 1;
 }
 
 
@@ -415,6 +432,11 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray *prhs[])
         
 
     global.sample_labels.release();
+
+
+    if(global.VERBOSE)
+        std::cout << "begin to parse arguments to functions" << std::endl;
+
     if (nrhs == 8){
         cv::Mat cluster_sizes0, cluster_locs0, cluster_stds0, cluster_Ex20;
         ocvMxArrayToMat_double(prhs[4], cluster_locs0);
@@ -426,10 +448,20 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray *prhs[])
         ocvMxArrayToMat_double(prhs[7], cluster_sizes0);
         cluster_sizes0.convertTo(cluster_sizes0, CV_32F);
 
+        if(global.VERBOSE)
+            std::cout << "parsing to arrays" << std::endl;
+        global.codebook.cluster_labels.release();  global.codebook.cluster_locs.release();
+        global.codebook.cluster_stds.release();
+        global.codebook.n_samples_per_cluster.release();
+
+        if(global.VERBOSE)
+            std::cout << "release containers" << std::endl;
         parseArgsToCodebook(cluster_locs0, cluster_stds0, cluster_Ex20, cluster_sizes0);
+
+        if(global.VERBOSE)
+            std::cout << "end to parse arguments to functions" << std::endl;
     }else{
-        global.codebook.cluster_labels.release();
-        global.codebook.cluster_locs.release();
+        global.codebook.cluster_labels.release();  global.codebook.cluster_locs.release();
         global.codebook.cluster_stds.release();
         global.codebook.n_samples_per_cluster.release();
         initializeCodebook();
@@ -451,11 +483,29 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray *prhs[])
     global.codebook.n_samples_per_cluster.convertTo(cluster_sizes, CV_64F);
 
 
+
+    if (global.VERBOSE)
+    {
+        std::cout << labels << std::endl;
+        std::cout << cluster_locs << std::endl;
+        std::cout << cluster_stds << std::endl;
+        std::cout << cluster_Ex2 << std::endl;
+        std::cout << cluster_sizes << std::endl;        
+    }
+
+
+
     plhs[0] = ocvMxArrayFromMat_double(labels);
     plhs[1] = ocvMxArrayFromMat_double(cluster_locs);
     plhs[2] = ocvMxArrayFromMat_double(cluster_stds);
     plhs[3] = ocvMxArrayFromMat_double(cluster_Ex2);
     plhs[4] = ocvMxArrayFromMat_double(cluster_sizes);
+
+    if (global.VERBOSE)
+    {
+        std::cout << "function ends" << std::endl;
+     
+    }
 
 }
 

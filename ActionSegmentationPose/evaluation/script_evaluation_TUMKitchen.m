@@ -1,31 +1,56 @@
 clear all;
-% close all;
+close all;
 clc;
 addpath(genpath('../../eval_package'));
-addpath(genpath('../../aca'));
+% addpath(genpath('../../aca'));
 addpath(genpath('../../TSC'));
 addpath(genpath('../../mexIncrementalClustering'));
-dataset_path = '/mnt/hdd/Dataset_TUMKitchen2';
+dataset_path = '/mnt/hdd/Dataset_TUMKitchen';
 video_list = importdata([dataset_path '/video_list.txt']);
 
 
 %%% scenario configuration - before each running, check here!"
-feature_list = {'jointLocs','relativeAngle','quaternion'};
-%%% note that jointLocs is relative jointlocs
-method_list = {'kmeans','spectralClustering','TSC','ACA','ours'};
-bodypart_list = {'rightArm','leftArm','torso'};
+feature_list = {'quaternion'};
 
-method = method_list{end};
-bodypart = bodypart_list{1};
-feature = feature_list{1};
+% method_list = {'spectralClustering','TSC','ACA'};
+method_list = {'ours'};
+% bodypart_list = {'rightArm','leftArm','torso'};
 
-is_show = 1; 
+bodypart_list = {'leftArm'};
+% method_list = {'ours'};
+% feature_list = {'jointLocs'};
+% 
+% bodypart = bodypart_list{1};
+% feature = feature_list{1};
+% method = method_list{end};
+
+is_save = 0;
+is_show = 0; 
 %%% scenario configuration - end"
 
-Precision = [];
-Recall = [];
+
+
+for bb = 1:length(bodypart_list)
+for ff = 1:length(feature_list)
+for mm = 1:length(method_list)
+
+
+bodypart = bodypart_list{bb};
+feature = feature_list{ff};
+method = method_list{mm};
+
+
+Pre = [];
+Rec = [];
+CMat = zeros(2,2);
 CptTime = [];
+
+
 for vv = 1:length(video_list)
+% for vv = 1:1
+    fprintf(' -- processing video %d\n',vv);
+    
+    
 % for vv = 10:10    
     %------------------ fearture extraction and annotation----------------%
     skeleton = importdata([dataset_path '/' video_list{vv} '/poses.csv']);    
@@ -58,6 +83,7 @@ for vv = 1:length(video_list)
         idx = spectralClustering(pattern,500,n_clusters);
         idx = idx-1; %%% 0-based label
 
+        
     elseif strcmp(method, 'TSC')
         %%%---Normalize the data---%%%
 %             X = normalize(pattern);
@@ -105,44 +131,64 @@ for vv = 1:length(video_list)
     elseif strcmp(method, 'HACA')
         idx = calACAOrHACA(pattern,36, 'HACA');
         idx(end) = []; %%% remove redudant frame
+        
+        
+        
+    elseif strcmp(method,'dclustering')
+        time_window = 30;
+        sigma = 0.005;
+
+        [idx1, C] = incrementalClustering(double(pattern), time_window,sigma,0);
+        idx = calLocalFeatureAggregationAndClustering_TUMKitchen(pattern,idx1,C, n_clusters,'normal_action'); 
+        
 
     elseif strcmp(method,'ours')
+        sigma = 1e-3;
         time_window = 25;
-        sigma = 1;
+        dist_type = 0;
+        verbose = 0;
 
 %         disp('--online learn the clusters and labels..');
-        [idx1, C] = incrementalClustering(double(pattern), time_window,sigma,0,0,1.0);
-%         idx2 = zeros(size(idx1));
-%         for kk = 2:length(idx1)
-%             if idx1(kk)~=idx1(kk-1)
-%                 idx2(kk) = idx1(kk)+randi(length(unique(idx1)))-1;
-%             else
-%                 idx2(kk) = idx2(kk-1);
-%             end
-%         end
-%         uid = mode(idx2);
-%         idx2(idx2==uid) = 10e6;
-%         idx2(idx2==0) = uid;
-%         idx2(idx2==10e6) = 0;
-%         disp('--postprocessing, merge clusters');
-        idx = calLocalFeatureAggregationAndClustering(pattern,idx1,C, n_clusters,'ours'); 
+%         [idx, c_locs, c_stds, c_ex2, c_sizes] = dynamicEM(double(pattern), sigma, dist_type,verbose);
+        [idx, c_locs] = incrementalClustering(double(pattern), time_window,sigma,0);
+
+%         idx = fun_feature_aggregation(pattern,idx,c_locs,'ours','TUMKitchen'); 
+%         idx = fun_feature_aggregation_slidingwindow(pattern,c_locs,n_clusters);
+        idx = fun_feature_aggregation_kernelizedcut(pattern,c_locs,1e-6,'batch');
+
 %         idx = idx1;
     end
+    
     CptTime = [CptTime toc(startTime)];
-    Result= funEvalSegmentation_TUMKitchen(yt, idx, 0.5, is_show);
-    Precision = [Precision Result.Prec];
-    Recall = [Recall Result.Rec];
+    res = evaluation_metric_TUMKitchen(yt, double(idx), 7, is_show); % tol range = 7
+    Pre = [Pre res.Segmentation.Pre];
+    Rec = [Rec res.Segmentation.Rec];
+    CMat = CMat + res.NovelBehavior.ConMat;
 end
-disp('====================================================')
-disp('Evaluation Results:')
-fprintf('Method: %s\n',method);
-fprintf('Bodypart: %s\n',bodypart);
-fprintf('Feature: %s\n',feature);
-fprintf('ave_precision: %f\n',mean(Precision));
-fprintf('ave_recall: %f\n',mean(Recall));
-fprintf('ave_runtime: %f\n',mean(CptTime));
+fprintf('=================TUMKitchen====%s==%s===%s=========\n',bodypart,feature,method);
+fprintf('- segmentation: avg_pre = %f\n',mean(Pre));
+fprintf('- segmentation: avg_rec = %f\n',mean(Rec));
+% fprintf('- segmentation: avg_f-measure = %f\n',2*mean(Pre)*mean(Rec)/(mean(Pre)+mean(Rec)));
+fprintf('- novelBehavior: avg_pre = %f\n',CMat(1,1)/(CMat(2,1)+CMat(1,1)));
+fprintf('- novelBehavior: avg_rec = %f\n',CMat(1,1)/(CMat(1,2)+CMat(1,1)));
+fprintf('- avg_runtime = %f seconds\n',mean(CptTime));
+
+if is_save
+    result_filename = sprintf('TUMKitchen_Result_%s_%s_%s.mat',bodypart,feature,method);
+    save(result_filename, 'yt','idx','Pre','Rec','CMat','CptTime');
+end
+
+
+% mean_Pre = [mean_Pre; mean(Pre)];
+% mean_Rec = [mean_Rec; mean(Rec)];
+% mean_novPre = [mean_novPre; CMat(1,1)/(CMat(2,1)+CMat(1,1))];
+% mean_novRec = [mean_novRec; CMat(1,1)/(CMat(1,2)+CMat(1,1))];
 
 
 
+
+end
+end
+end
     
     

@@ -1,45 +1,57 @@
 function idx = fun_feature_aggregation_no_encoding(X,Xl,method,varargin)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% This function consists of two steps: feature aggregation and clustering.
+% This function only performs temporal pooling based on the encoded
+% features.
+% varargin = {dataset, #clusters of moving, #clusters of pose}
 % Feature aggregation = temporal pooling.
 % Stationary regions are moving regions are separately aggregated.
 % stationary states and moving action patterns are separately clustered.
 % Action parsing is combinition of the two.
+% dataset= varargin{1}
+% #clusters_movements = varargin{2}
+% #clusters_stationary = varargin{3}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% %%% set params CMUMAD%%%
-moving_variance_window = 31;
-gaussian_filter_sigma = 12.5;
-min_peak_distance = 60;
-sigma_dclustering = 0.00005;
-sigma_dclustering_stationary = 0.75;
-peak_width_weight = 1;
+dataset=varargin{1};
 
+if strcmp(dataset, 'CMUMAD')
 
-% %%%
+    %%% set params CMUMAD%%%
+    moving_variance_window = 60;
+    gaussian_filter_sigma = 12.5;
+    min_peak_distance = 60;
+    sigma_dclustering = 1e-8;
+    sigma_dclustering_stationary = 0.75;
+    peak_width_weight = 0.65;
+    
+elseif strcmp(dataset, 'TUMKitchen')
+    %%% set params TUMKitchen%%%
+    moving_variance_window = 25;
+    gaussian_filter_sigma = 6.5;
+    min_peak_distance = 25;
+    sigma_dclustering = 0.05;
+    sigma_dclustering_stationary = 5;
+    peak_width_weight = 0.75;
+    %%%
+elseif strcmp(dataset,'HDM05') % to tune
+    moving_variance_window = 25;
+    gaussian_filter_sigma = 6.5;
+    min_peak_distance = 25;
+    sigma_dclustering = 0.05;
+    sigma_dclustering_stationary = 5;
+    peak_width_weight = 0.75;
 
-
-% 
-% %%% set params TUMKitchen%%%
-% moving_variance_window = 25;
-% gaussian_filter_sigma = 6.5;
-% min_peak_distance = 25;
-% sigma_dclustering = 0.05;
-% sigma_dclustering_stationary = 5;
-% peak_width_weight = 0.75;
-% %%%
-
-
-%%% set params BOMNI scenario1 %%%
-% moving_variance_window = 25;
-% gaussian_filter_sigma = 6.5;
-% min_peak_distance = 30;
-% sigma_dclustering = 0.00005;
-% sigma_dclustering_stationary = 0.00005;
-% peak_width_weight = 0.5;
+elseif strcmp(dataset,'BOMNI')
+    %%% set params BOMNI scenario1 %%%
+    moving_variance_window = 30;
+    gaussian_filter_sigma = 7.5;
+    min_peak_distance = 45;
+    sigma_dclustering = 0.1;
+    sigma_dclustering_stationary = 1e-5;
+    peak_width_weight = 0.5;
 %%%
-
+end
 
 %% aggregate action patterns
 %%% moving variance computation
@@ -64,7 +76,7 @@ end
 
 
 if strcmp(method, 'kmeans')
-    nc = varargin{1};
+    nc = varargin{2};
     if size(features,1) <= nc
         iidx = 1:size(features,1);
     else
@@ -81,8 +93,8 @@ end
 
 idx = zeros(size(Xl));
 for pp = 1:length(pks_label)
-    lb = max(1,locs_label(pp)-pks_width(pp));
-    ub = min(size(X,1), locs_label(pp)+pks_width(pp));
+    lb = max(1,locs_label(pp)-round(peak_width_weight*pks_width(pp)));
+    ub = min(size(X,1), locs_label(pp)+round(peak_width_weight*pks_width(pp)));
     idx(lb:ub)=iidx(pp);
 end
 
@@ -102,7 +114,7 @@ for kk = 1:n_regions
 end
 
 if strcmp(method, 'kmeans')
-    nc = varargin{1};
+    nc = varargin{3};
     if size(features,1) <= nc
         iidx = 1:size(features_stationary,1);
     else

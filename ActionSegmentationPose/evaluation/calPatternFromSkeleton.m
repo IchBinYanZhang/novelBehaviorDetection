@@ -1,6 +1,13 @@
 function [xt, xl, xr] = calPatternFromSkeleton(skeleton, type)
 
 
+if ~strcmp(type, 'jointLocs') && ~strcmp(type, 'relativeAngle') && ~strcmp(type, 'quaternion')
+
+    error('not a valid feature type!');
+end
+
+
+
 torso_joint = {'ULW', 'OLW','UBW','OBW','UHW','BRK','OHW'};
 left_arm_joint = {'SBL','OAL','UAL','HAL','FIL'};
 right_arm_joint = {'SBR','OAR','UAR','HAR','FIR'};
@@ -9,6 +16,8 @@ right_arm_joint = {'SBR','OAR','UAR','HAR','FIR'};
 xt = []; % location coordinate
 rat = []; % relative angle
 qut = []; % quaternion
+
+
 
 for ii = 1:length(torso_joint)
     idx = find(contains(skeleton.textdata,torso_joint{ii}));
@@ -44,14 +53,14 @@ if ~strcmp(type, 'jointLocs')
     elseif strcmp(type,'quaternion')
         xt = qut;
     end
-else
-    n_joints = size(xt,2)/3;
-    for jj = 1:n_joints
-        xt(:,3*jj-2) = xt(:,3*jj-2)-xt(:,1);
-        xt(:,3*jj-1) = xt(:,3*jj-1)-xt(:,2);
-        xt(:,3*jj-0) = xt(:,3*jj-0)-xt(:,3);
-    end
-    xt(:,1:3) = [];
+% else
+%     n_joints = size(xt,2)/3;
+%     for jj = 1:n_joints
+%         xt(:,3*jj-2) = xt(:,3*jj-2)-xt(:,1);
+%         xt(:,3*jj-1) = xt(:,3*jj-1)-xt(:,2);
+%         xt(:,3*jj-0) = xt(:,3*jj-0)-xt(:,3);
+%     end
+%     xt(:,1:3) = [];
     
 end
         
@@ -93,14 +102,14 @@ if ~strcmp(type, 'jointLocs')
     elseif strcmp(type,'quaternion')
         xl = qul;
     end
-else
-    n_joints = size(xl,2)/3;
-    for jj = 1:n_joints
-        xl(:,3*jj-2) = xl(:,3*jj-2)-xl(:,1);
-        xl(:,3*jj-1) = xl(:,3*jj-1)-xl(:,2);
-        xl(:,3*jj-0) = xl(:,3*jj-0)-xl(:,3);
-    end
-    xl(:,1:3) = [];
+% else
+%     n_joints = size(xl,2)/3;
+%     for jj = 1:n_joints
+%         xl(:,3*jj-2) = xl(:,3*jj-2)-xl(:,1);
+%         xl(:,3*jj-1) = xl(:,3*jj-1)-xl(:,2);
+%         xl(:,3*jj-0) = xl(:,3*jj-0)-xl(:,3);
+%     end
+%     xl(:,1:3) = [];
 
 end
 
@@ -144,14 +153,14 @@ if ~strcmp(type, 'jointLocs')
     elseif strcmp(type,'quaternion')
         xr = qur;
     end
-else
-    n_joints = size(xr,2)/3;
-    for jj = 1:n_joints
-        xr(:,3*jj-2) = xr(:,3*jj-2)-xr(:,1);
-        xr(:,3*jj-1) = xr(:,3*jj-1)-xr(:,2);
-        xr(:,3*jj-0) = xr(:,3*jj-0)-xr(:,3);
-    end
-    xr(:,1:3) = [];
+% else
+%     n_joints = size(xr,2)/3;
+%     for jj = 1:n_joints
+%         xr(:,3*jj-2) = xr(:,3*jj-2)-xr(:,1);
+%         xr(:,3*jj-1) = xr(:,3*jj-1)-xr(:,2);
+%         xr(:,3*jj-0) = xr(:,3*jj-0)-xr(:,3);
+%     end
+%     xr(:,1:3) = [];
 
 end
 

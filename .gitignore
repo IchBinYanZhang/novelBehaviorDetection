@@ -1,2 +1,8 @@
 *.mat
 *.m~
+*.pdf
+*.fig
+*.png
+aca/
+TSC/
+.ipynb*/

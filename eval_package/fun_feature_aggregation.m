@@ -8,37 +8,48 @@ function idx = fun_feature_aggregation(X,Xl,C,method,varargin)
 % Action parsing is combinition of the two.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% %%% set params CMUMAD%%%
-moving_variance_window = 60;
-gaussian_filter_sigma = 12.5;
-min_peak_distance = 60;
-sigma_dclustering = 1e-8;
-sigma_dclustering_stationary = 0.75;
-peak_width_weight = 0.8;
+dataset=varargin{1};
 
+if strcmp(dataset, 'CMUMAD')
 
-% %%%
+    %%% set params CMUMAD%%%
+    moving_variance_window = 60;
+    gaussian_filter_sigma = 12.5;
+    min_peak_distance = 60;
+    sigma_dclustering = 1e-8;
+    sigma_dclustering_stationary = 100;
+    peak_width_weight = 0.65;
+    W_dclustering = 1;
+elseif strcmp(dataset, 'TUMKitchen')
+    %%% set params TUMKitchen%%%
+    %%% jointlocation, rightarms + leftarms %%%
+    moving_variance_window = 25;
+    gaussian_filter_sigma = 6.5;
+    min_peak_distance = 25;
+    sigma_dclustering = 0.03;%arms 1 for torso
+    sigma_dclustering_stationary =0.03; %arms, 1 for torso
+    peak_width_weight = 0.5;
+    W_dclustering = 5;
+    %%%
+elseif strcmp(dataset,'HDM05') % to tune
+    moving_variance_window = 30;
+    gaussian_filter_sigma = 6.5;
+    min_peak_distance = 30;
+    sigma_dclustering = 0.05;
+    sigma_dclustering_stationary = 0.05;
+    peak_width_weight = 1;
 
-
-% 
-% %%% set params TUMKitchen%%%
-% moving_variance_window = 25;
-% gaussian_filter_sigma = 6.5;
-% min_peak_distance = 25;
-% sigma_dclustering = 0.05;
-% sigma_dclustering_stationary = 5;
-% peak_width_weight = 0.75;
-% %%%
-
-
-%%% set params BOMNI scenario1 %%%
-% moving_variance_window = 25;
-% gaussian_filter_sigma = 6.5;
-% min_peak_distance = 30;
-% sigma_dclustering = 0.00005;
-% sigma_dclustering_stationary = 0.00005;
-% peak_width_weight = 0.5;
+elseif strcmp(dataset,'BOMNI')
+    %%% set params BOMNI scenario1 %%%
+    moving_variance_window = 30;
+    gaussian_filter_sigma = 6.5;
+    min_peak_distance = 30;
+    sigma_dclustering = 0.1;
+    sigma_dclustering_stationary = 1e-5;
+    peak_width_weight = 0.3;
 %%%
+end
+
 
 
 %% aggregate action patterns
@@ -63,17 +74,17 @@ end
 
 
 if strcmp(method, 'kmeans')
-    nc = varargin{1};
+    nc = varargin{2};
     if size(features,1) <= nc
         iidx = 1:size(features,1);
     else
         iidx = kmeans(features, nc);
     end    
 elseif strcmp(method,'ours')
-    time_window = 1;
-    is_temporal_reg = 0;
-    [iidx, ~,~,~] = dynamicEM(features,...
-        sigma_dclustering,0,0);
+%     [iidx, ~,~,~] = dynamicEM(features,...
+%         sigma_dclustering,0,0);
+      [iidx, ~] = incrementalClustering(features, W_dclustering,sigma_dclustering,0);
+
 else 
     error('[Error] calLocalFeatureAggregationAndClustering(): method is incorrect!');
 end
@@ -88,6 +99,8 @@ end
 
 
 %% aggregate stationary body configs, checking number of different body configs
+% if ~strcmp(dataset, 'CMUMAD')
+    %%% in case of CUMMAD, we only interests on moving actions
 idx2 = idx;
 idx2(idx2~=0) = 1;
 idx2 = 1-idx2;
@@ -104,17 +117,19 @@ for kk = 1:n_regions
 end
 
 if strcmp(method, 'kmeans')
-    nc = varargin{1};
+    nc = varargin{3};
     if size(features,1) <= nc
         iidx = 1:size(features_stationary,1);
     else
         iidx = kmeans(features_stationary, nc);
     end
-    
+
 elseif strcmp(method,'ours')
 
-    [iidx, ~,~,~] = dynamicEM(features_stationary,...
-        sigma_dclustering_stationary,0,0);
+%     [iidx, ~,~,~] = dynamicEM(features_stationary,...
+%         sigma_dclustering_stationary,0,0);
+      [iidx, ~] = incrementalClustering(features_stationary, W_dclustering,sigma_dclustering_stationary,0);
+
 else 
     error('[Error] calLocalFeatureAggregationAndClustering(): method is incorrect!');
 end
@@ -123,9 +138,9 @@ max_label = max(idx)+3;
 
 
 for kk = 1:n_regions
-    idx(idx3==kk) = iidx(kk)+max_label;
+    idx(idx3==kk) = iidx(kk)-max_label;
 end
-
+% end
 end
 
 
