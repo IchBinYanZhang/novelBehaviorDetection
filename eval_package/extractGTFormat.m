@@ -1,4 +1,6 @@
 function dst = extractGTFormat(src)
+%%% extract ground truth format of the CMUMAD dataset
+
 
 src(src(:,1)>=1000,1) = 36;
 

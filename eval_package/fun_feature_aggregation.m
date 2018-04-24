@@ -1,6 +1,7 @@
 function idx = fun_feature_aggregation(X,Xl,C,method,varargin)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Motion energy-based pooling
 % This function consists of two steps: feature aggregation and clustering.
 % Feature aggregation = feature encoding + temporal pooling.
 % Stationary regions are moving regions are separately aggregated.

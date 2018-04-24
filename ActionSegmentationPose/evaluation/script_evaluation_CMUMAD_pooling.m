@@ -1,6 +1,9 @@
+%%% (1) The script is specific to investigate functions of temporal pooling.
+%%% (2) Script for CMUMAD
+
 clear all;
 close all;
-% clc;
+clc;
 addpath(genpath('../../eval_package'));
 addpath(genpath('../../TSC'));
 addpath(genpath('../../mexIncrementalClustering'));
@@ -12,7 +15,7 @@ feature = 'BodyPose';
 % method_set = { 'ours'};
 pose_feature_set = {'quaternions'};
 method_set = {'ktc-s'};
-% method_set = {'ours','sliding_window','ktc-s','sst'};
+% method_set = {'ours','sliding_window','ktc-s'};
 % pose_feature_set = {'jointLocs', 'relativeAngle', 'quaternions'};
 
 
@@ -47,8 +50,9 @@ for mm = 1:length(method_set)
                 end
 
                 n_clusters = 36;
+                
+                %%%% start dynamic clustering
                 startTime = tic;
- 
                 time_window = 30;
                 sigma = 0.09;
                 dist_type = 0; % Euclidean distance

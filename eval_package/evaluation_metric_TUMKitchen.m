@@ -1,9 +1,3 @@
-
-% Evaluation for action segmentation based on occurrence and boundary.
-% The evaluation is implemented according to the following work: 
-% Dong Huang, Yi Wang, Shitong Yao and F. De la Torre. Sequential Max-Margin Event Detectors, ECCV 2014
-% The script is modified by yan.zhang@uni-ulm.de
-
 function Result= evaluation_metric_TUMKitchen(gt, prd, thr, is_show)
 % INPUTS:
 %

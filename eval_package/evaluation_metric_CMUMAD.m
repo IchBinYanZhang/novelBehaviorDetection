@@ -2,7 +2,7 @@ function Result= evaluation_metric_CMUMAD(gtlabE, tslab, thr, is_show)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Evaluation is two-fold:
-%   (1) boundary-based precision-recall
+%   (1) region-based precision-recall
 %   (2) confusion matrix for novel behavior recognition
 %       Each input sample is encoded to two states: a) in new cluster and
 %       b) in old cluster

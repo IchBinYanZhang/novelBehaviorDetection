@@ -2,17 +2,14 @@ function [Comp] = pca_1comp(X)
 % Principal Componant Analysis (PCA).
 %
 % Input
-%   X       -  sample matrix, dim x n
+%   X       -  sample matrix, n x dim
 %
 % Output
-%   Comp    -  principal components, dim x n
-%   Lamb    -  sorted lambda (eigenvalue), dim x 1
-%   Dire    -  principal directions, dim x dim
-%   me      -  mean vector of X, dim x 1
+%   Comp    -  the dominant principal components, dim x 1
 %
 % History
-%   create  -  Feng Zhou (zhfe99@gmail.com), 12-30-2008
-%   modify  -  Feng Zhou (zhfe99@gmail.com), 11-01-2009
+%   create  -  Yan Zhang (yz-cnsdqz.github.io)
+%   modified from  -  Feng Zhou (zhfe99@gmail.com), 11-01-2009
 
 [dim, n] = size(X);
 

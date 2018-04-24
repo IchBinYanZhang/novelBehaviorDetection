@@ -1,5 +1,15 @@
 function idx = fun_feature_aggregation_kernelizedcut(X,C,sigma_dclustering, cut_method)
 
+%%% ------------------kernelized cut-based pooling------------------
+%%% Input:  X - input feature array. Samples are arranged row-wisely.
+%%%         C - cluster centers for feature encoding. The output from the
+%%%             first DC
+%%%         sigma_dclustering - the radius of the second DC module
+%%%         cut_method - 'sequential' or 'batch'
+%%% Output: idx - the final parsing result, arranged in a 1D sequence
+
+
+
 if ~strcmp(cut_method, 'sequential') && ~strcmp(cut_method, 'batch')
     error('[error] fun_feature_aggregation_kernelizedcut: cut_method must be either sequential or batch!');
 end

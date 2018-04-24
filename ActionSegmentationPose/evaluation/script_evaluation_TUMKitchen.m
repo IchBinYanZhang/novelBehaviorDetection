@@ -1,8 +1,11 @@
+%%% (1) script to evaluate the abnormality recognition in TUMKitchen
+%%% (2) frontend of the evaluation pipeline
+
+
 clear all;
 close all;
 clc;
 addpath(genpath('../../eval_package'));
-% addpath(genpath('../../aca'));
 addpath(genpath('../../TSC'));
 addpath(genpath('../../mexIncrementalClustering'));
 dataset_path = '/mnt/hdd/Dataset_TUMKitchen';
@@ -10,19 +13,14 @@ video_list = importdata([dataset_path '/video_list.txt']);
 
 
 %%% scenario configuration - before each running, check here!"
-feature_list = {'quaternion'};
+% feature_list = {'jointLocs','relativeAngle','quaternion'};
+feature_list = {'quaternion'}; 
 
 % method_list = {'spectralClustering','TSC','ACA'};
 method_list = {'ours'};
-% bodypart_list = {'rightArm','leftArm','torso'};
 
+% bodypart_list = {'rightArm','leftArm','torso'};
 bodypart_list = {'leftArm'};
-% method_list = {'ours'};
-% feature_list = {'jointLocs'};
-% 
-% bodypart = bodypart_list{1};
-% feature = feature_list{1};
-% method = method_list{end};
 
 is_save = 0;
 is_show = 0; 
@@ -99,40 +97,20 @@ for vv = 1:length(video_list)
         paras.stepsize = 0.1;
 
         %%%---Learn representations Z---%%%
-%             disp('--first pca to 100d; otherwise computation is prohibitively expensive.');
-%             [comp,XX,~] = pca(pattern, 'NumComponents',100);
+%         disp('--first pca to 100d; otherwise computation is prohibitively expensive.');
+%         [comp,XX,~] = pca(pattern, 'NumComponents',100);
         [D, Z, err] = TSC_ADMM(pattern',paras);
         disp('clustering via graph cut..');
-%             nbCluster = length(unique(label));
         vecNorm = sqrt(sum(Z.^2));
         W2 = (Z'*Z) ./ (vecNorm'*vecNorm + 1e-6);
         [oscclusters,~,~] = ncutW(W2,n_clusters);
         idx = denseSeg(oscclusters, 1);
-        idx = idx;
-
-%         uid = idx(1);
-%         idx(idx==uid) = 10e6;
-%         idx(idx==1) = uid;
-%         idx(idx==10e6) = 1;
         idx = idx-1; %%% 0-based label
 
 
     elseif strcmp(method, 'ACA')
         idx = calACAOrHACA(pattern,n_clusters, 'ACA');
         idx(end) = []; %%% remove redudant frame
-
-%         uid = idx(1);
-%         idx(idx==uid) = 10e6;
-%         idx(idx==1) = uid;
-%         idx(idx==10e6) = 1;
-%         idx = idx-1; %%% 0-based label
-%         save('ACA_idx_TUMKitchen.mat','idx');
-
-    elseif strcmp(method, 'HACA')
-        idx = calACAOrHACA(pattern,36, 'HACA');
-        idx(end) = []; %%% remove redudant frame
-        
-        
         
     elseif strcmp(method,'dclustering')
         time_window = 30;
@@ -148,7 +126,6 @@ for vv = 1:length(video_list)
         dist_type = 0;
         verbose = 0;
 
-%         disp('--online learn the clusters and labels..');
 %         [idx, c_locs, c_stds, c_ex2, c_sizes] = dynamicEM(double(pattern), sigma, dist_type,verbose);
         [idx, c_locs] = incrementalClustering(double(pattern), time_window,sigma,0);
 
@@ -156,7 +133,6 @@ for vv = 1:length(video_list)
 %         idx = fun_feature_aggregation_slidingwindow(pattern,c_locs,n_clusters);
         idx = fun_feature_aggregation_kernelizedcut(pattern,c_locs,1e-6,'batch');
 
-%         idx = idx1;
     end
     
     CptTime = [CptTime toc(startTime)];
@@ -177,13 +153,6 @@ if is_save
     result_filename = sprintf('TUMKitchen_Result_%s_%s_%s.mat',bodypart,feature,method);
     save(result_filename, 'yt','idx','Pre','Rec','CMat','CptTime');
 end
-
-
-% mean_Pre = [mean_Pre; mean(Pre)];
-% mean_Rec = [mean_Rec; mean(Rec)];
-% mean_novPre = [mean_novPre; CMat(1,1)/(CMat(2,1)+CMat(1,1))];
-% mean_novRec = [mean_novRec; CMat(1,1)/(CMat(1,2)+CMat(1,1))];
-
 
 
 

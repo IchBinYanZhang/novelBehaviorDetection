@@ -1,18 +1,23 @@
+%%% (1) script to evaluate the abnormality recognition in CMUMAD
+%%% (2) frontend of the evaluation pipeline
+
+
 clear all;
 close all;
-% clc;
+clc;
 addpath(genpath('../../eval_package'));
 addpath(genpath('../../aca'));
 addpath(genpath('../../TSC'));
 addpath(genpath('../../mexIncrementalClustering'));
-%% evaluate script
+
 dataset = '/home/yzhang/Videos/Dataset_CMUMAD';
 subject = 1:20;
 feature = 'BodyPose';
-% method_set = { 'ours'};
-pose_feature_set = {'jointLocs'};
+% pose_feature_set = {'jointLocs','relativeAngle','quaternions'}
+% method_set = {'kmeans','spectralClustering','TSC','ACA','dclustering','ours'}
+pose_feature_set = {'jointLocs'}; 
 method_set = {'TSC'};
-% pose_feature_set = {'jointLocs', 'relativeAngle', 'quaternions'};
+
 
 
 for mm = 1:length(method_set)
@@ -55,12 +60,6 @@ for mm = 1:length(method_set)
                     idx = calLocalFeatureAggregationAndClustering(pattern,idx,C, 36); 
 
                     
-                elseif strcmp(method, 'regularSampling')
-                        %%% regular sampling
-                    prd_boundary = 1:30:size(pattern,1);
-                    idx = zeros(size(pattern,1),1);
-                    idx(prd_boundary) = 1;
-                    
                 elseif strcmp(method, 'spectralClustering')
                     idx = spectralClustering(pattern,1,n_clusters);
                     uid = idx(1);
@@ -97,22 +96,13 @@ for mm = 1:length(method_set)
                 elseif strcmp(method, 'ACA')
                     idx = calACAOrHACA(pattern,36, 'ACA');
                     idx(end) = []; %%% remove redudant frame
-                    
 
-                elseif strcmp(method, 'HACA')
-                    idx = calACAOrHACA(pattern,36, 'HACA');
-                    idx(end) = []; %%% remove redudant frame
 
                     
                 elseif strcmp(method, 'dclustering')
                     time_window = 30;
-                    sigma = 0.09;
-                    
-%                     disp('--online learn the clusters and labels..');
+                    sigma = 0.09;                    
                     [idx, C] = incrementalClustering(double(pattern), time_window,sigma,0);
-
-                    %%% uncomment the following for online processing
-%                     disp('--postprocessing, merge clusters');
                     idx = calLocalFeatureAggregationAndClustering(pattern,idx,C, 36); 
                     
                     
@@ -121,13 +111,10 @@ for mm = 1:length(method_set)
                     sigma = 0.02;
                     dist_type = 0; % Euclidean distance
                     verbose = 0;
-%                     disp('--online learn the clusters and labels..');
-%                     [idx, C] = incrementalClustering(double(pattern), time_window,sigma,0,0,1.0);
-%                     [idx1, C] = incrementalClusteringAndOnlineAgg(double(pattern), time_window, sigma, 0, 0, 1.0);
+%                     
 %                     [idx1, c_locs, c_stds, c_ex2, c_sizes] = dynamicEM(double(pattern), sigma, dist_type,verbose);
                     [idx1, c_locs] = incrementalClustering(double(pattern), time_window,sigma,0);
-                    %%% uncomment the following for online processing
-%                     disp('--postprocessing, merge clusters');
+
 %                     idx = fun_feature_aggregation(pattern,idx1,c_locs,'ours','CMUMAD');
                     idx = fun_feature_aggregation_slidingwindow(pattern,c_locs,0.8e-5);
                     

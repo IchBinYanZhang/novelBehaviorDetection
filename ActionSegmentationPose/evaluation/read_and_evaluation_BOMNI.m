@@ -1,3 +1,13 @@
+%%% Evaluation on the BOMNI dataset
+%%% This script is developed for evaluating the performance of {Dirichlet
+%%% process mixture model},{Dirichlet process mixture model -
+%%% aggregation} and {Growing Neural gas}. Since these methods are
+%%% implemented in Python, this matlab script reads the results of the
+%%% Python scripts and perform evaluation.
+
+%%% developed by Yan Zhang (yz-cnsdqz.github.io)
+
+
 clear all;
 close all;
 clc;
@@ -9,7 +19,6 @@ dataset_path = '/home/yzhang/Videos/Dataset_BOMNI'; %% only scenario1, side view
 video_list = importdata([dataset_path '/scenario1/video_list2.txt']);
 action_list = {'"walking"','"sitting"', '"drinking"','"washing-hands"','"opening-closing-door"','"fainted"'};
 method_list = {'DPMM-A'};
-% method_list = {'GNG'};
 
 
 

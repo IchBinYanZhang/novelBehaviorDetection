@@ -1,12 +1,5 @@
 function idx = fun_feature_aggregation_online(X,Xl,C,idx_pre, method,varargin)
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% This function consists of two steps: feature aggregation and clustering.
-% Feature aggregation = feature encoding + temporal pooling.
-% Stationary regions are moving regions are separately aggregated.
-% stationary states and moving action patterns are separately clustered.
-% Action parsing is combinition of the two.
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 dataset=varargin{1};
 

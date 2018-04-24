@@ -1,3 +1,16 @@
+%%% Evaluation on the HDM05 dataset
+%%% This script is developed for evaluating the performance of {Dirichlet
+%%% process mixture model},{Dirichlet process mixture model -
+%%% aggregation} and {Growing Neural gas}. Since these methods are
+%%% implemented in Python, this matlab script reads the results of the
+%%% Python scripts and perform evaluation.
+
+%%% developed by Yan Zhang (yz-cnsdqz.github.io)
+
+
+
+
+
 clear all;
 close all;
 clc;

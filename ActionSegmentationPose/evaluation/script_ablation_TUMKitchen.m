@@ -1,5 +1,11 @@
-% clear all;
-% close all;
+%%% Script for ablation study. 
+%%% This script is not used in current project, but preserved for later
+%%% study.
+
+
+
+clear all;
+close all;
 clc;
 addpath(genpath('../../eval_package'));
 addpath(genpath('../../aca'));
