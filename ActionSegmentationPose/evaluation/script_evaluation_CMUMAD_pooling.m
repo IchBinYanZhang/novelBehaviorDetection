@@ -13,7 +13,7 @@ dataset = '/home/yzhang/Videos/Dataset_CMUMAD';
 subject = 1:20;
 feature = 'BodyPose';
 % method_set = { 'ours'};
-pose_feature_set = {'quaternions'};
+pose_feature_set = {'jointLocs'};
 method_set = {'ktc-s'};
 % method_set = {'ours','sliding_window','ktc-s'};
 % pose_feature_set = {'jointLocs', 'relativeAngle', 'quaternions'};
@@ -54,7 +54,7 @@ for mm = 1:length(method_set)
                 %%%% start dynamic clustering
                 startTime = tic;
                 time_window = 30;
-                sigma = 0.09;
+                sigma = 0.02;
                 dist_type = 0; % Euclidean distance
                 verbose = 0;
                 disp('--- dynamic clustering on input features');
@@ -65,7 +65,7 @@ for mm = 1:length(method_set)
                 elseif strcmp(method,'sliding_window')
                     idx = fun_feature_aggregation_slidingwindow(pattern,c_locs,0.8e-5);
                 elseif strcmp(method,'ktc-s')
-                    idx = fun_feature_aggregation_kernelizedcut(pattern,c_locs,8e-6,'batch');
+                    idx = fun_feature_aggregation_kernelizedcut(pattern,c_locs,8e-6,'sequential');
                 end
 
 

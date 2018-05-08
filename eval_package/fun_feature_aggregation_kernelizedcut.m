@@ -15,9 +15,9 @@ if ~strcmp(cut_method, 'sequential') && ~strcmp(cut_method, 'batch')
 end
 
 
-%W = 100;S = 1; alpha = 1.5; % if cmumad
+W = 100;S = 1; alpha = 1.5; % if cmumad
 % W = 30; S=1; alpha = 1.2; % if tumkitchen
-W = 30; S=1; alpha = 1.2; % if BOMNI
+% W = 30; S=1; alpha = 1.2; % if BOMNI
 
 
 n_frames = size(X,1);
